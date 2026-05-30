@@ -39,6 +39,15 @@ if [[ $(adguardvpn-cli status | head -n 1) == "VPN is disconnected" ]]; then
   exit
 fi
 
+# Resume only errored torrents
+if [[ -v QBT_USERNAME && -v QBT_PASSWORD ]]; then
+  curl -s -c /tmp/qbt_cron_cookie -X POST http://localhost:8080/api/v2/auth/login --data-urlencode "username=${QBT_USERNAME}" --data-urlencode "password=${QBT_PASSWORD}" 2>/dev/null
+  ERRORED=$(curl -s -b /tmp/qbt_cron_cookie 'http://localhost:8080/api/v2/torrents/info?filter=errored' 2>/dev/null | grep -o '"hash":"[^"]*"' | cut -d'"' -f4 | paste -sd'|')
+  if [[ -n "$ERRORED" ]]; then
+    curl -s -b /tmp/qbt_cron_cookie -X POST 'http://localhost:8080/api/v2/torrents/start' -d "hashes=$ERRORED" 2>/dev/null
+  fi
+fi
+
 end=$((SECONDS+52))
 while [[ "$SECONDS" -lt "$end" ]]; do
     if [[ $terminate_flag -eq 1 ]]; then

@@ -14,6 +14,8 @@ services:
       - WEBUI_PORT=8080
       - HOME=/config
       - AGVPN_CLI_DATA_PATH=/adguard-config
+      - QBT_USERNAME=${QBT_USERNAME:-admin}
+      - QBT_PASSWORD=${QBT_PASSWORD:-admin}
     volumes:
       - qbittorrent_config:/config
       - adguardvpn_config:/adguard-config
