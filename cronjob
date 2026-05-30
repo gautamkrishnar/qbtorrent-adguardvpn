@@ -1,0 +1,56 @@
+#!/bin/bash
+source /functions.sh
+
+PIDFILE="/tmp/cronjob.pid"
+terminate_flag=0
+
+VPN_IP=$(read_var VPN_IP)
+
+terminate_script() {
+  echo "Termination signal received, setting flag..."
+  terminate_flag=1
+}
+
+cleanup() {
+  echo "Cleaning up..."
+  rm -f "$PIDFILE"
+  exit 0
+}
+
+trap terminate_script SIGTERM
+
+if [ -f "$PIDFILE" ]; then
+  OLDPID=$(cat "$PIDFILE")
+  if ps -p $OLDPID > /dev/null 2>&1; then
+    echo "Script is already running with PID $OLDPID, sending termination signal..."
+    kill -TERM $OLDPID
+    while ps -p $OLDPID > /dev/null 2>&1; do
+      echo "Waiting for the old script to terminate..."
+      sleep 1
+    done
+  fi
+fi
+
+echo $$ > "$PIDFILE"
+
+if [[ $(adguardvpn-cli status | head -n 1) == "VPN is disconnected" ]]; then
+  echo "VPN disconnected, restarting..."
+  docker restart $(hostname)
+  exit
+fi
+
+end=$((SECONDS+52))
+while [[ "$SECONDS" -lt "$end" ]]; do
+    if [[ $terminate_flag -eq 1 ]]; then
+      echo "Termination flag is set, exiting loop..."
+      break
+    fi
+    sleep 4
+    current_ip=$(get_ip)
+    if [[ -n "$current_ip" && "$current_ip" != "$VPN_IP" ]]; then
+      echo "Change in IP detected, restarting..."
+      docker restart $(hostname)
+    fi
+    write_var "LAST_RUN" "$(date +%s)"
+done
+cleanup

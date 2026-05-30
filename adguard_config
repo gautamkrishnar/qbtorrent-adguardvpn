@@ -1,0 +1,50 @@
+#!/bin/bash
+source /functions.sh
+
+if [[ "$(read_var CREATED $VAR_STORE)" != "yes" ]]; then
+  write_var "CREATED" "yes"
+  adguardvpn-cli config set-system-dns off
+fi
+
+VPN_STATUS=$(adguardvpn-cli status 2>&1 | head -n 1)
+if [[ "$VPN_STATUS" == *"not logged in"* ]] || [[ "$VPN_STATUS" == *"Please log in"* ]]; then
+  if [[ -v ADGUARD_USERNAME && -v ADGUARD_PASSWORD ]]; then
+    adguardvpn-cli login -u "$ADGUARD_USERNAME" -p "$ADGUARD_PASSWORD"
+  fi
+fi
+
+VPN_STATUS=$(adguardvpn-cli status 2>&1 | head -n 1)
+if [[ "$VPN_STATUS" =~ ^Connected\ to\ .* ]]; then
+  adguardvpn-cli disconnect
+  sleep 5
+  VPN_STATUS=$(adguardvpn-cli status 2>&1 | head -n 1)
+  if [[ "$VPN_STATUS" =~ ^Connected\ to\ .* ]]; then
+    echo "NOT DISCONNECTED AFTER DISCONNECT - THIS SHOULD NOT HAPPEN!!!"
+    docker stop $(hostname)
+  fi
+fi
+
+HOST_IP=$(get_ip)
+write_var "HOST_IP" "$HOST_IP"
+
+if [[ -v ADGUARD_LOCATION ]]; then
+  adguardvpn-cli connect -y -4 -l "$ADGUARD_LOCATION" &
+else
+  adguardvpn-cli connect -y -4 -f &
+fi
+
+sleep 5
+
+if [[ ! $(adguardvpn-cli status | head -n 1) =~ ^Connected\ to\ .* ]]; then
+  echo "Unable to connect to VPN, restarting..."
+  sleep 5
+  docker restart $(hostname)
+fi
+
+VPN_IP=$(get_ip)
+write_var "VPN_IP" "$VPN_IP"
+
+if [[ -n ${var+x} && "$HOST_IP" == "$VPN_IP" ]]; then
+  echo "HOST_IP == VPN_IP THIS SHOULD NOT HAPPEN!!!"
+  docker stop $(hostname)
+fi

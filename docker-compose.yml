@@ -1,0 +1,32 @@
+services:
+  qbittorrent:
+    image: ghcr.io/gautamkrishnar/qbtorrent-adguardvpn:latest
+    build: .
+    container_name: qbittorrent-vpn
+    privileged: true
+    stop_grace_period: 30s
+    env_file:
+      - .env
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-UTC}
+      - WEBUI_PORT=8080
+      - HOME=/config
+      - AGVPN_CLI_DATA_PATH=/adguard-config
+    volumes:
+      - qbittorrent_config:/config
+      - adguardvpn_config:/adguard-config
+      - /var/run/docker.sock:/var/run/docker.sock
+      - type: bind
+        source: '${DOWNLOADS_PATH:?Set DOWNLOADS_PATH in .env}'
+        target: '/downloads'
+    ports:
+      - "8080:8080"
+      - "6881:6881"
+      - "6881:6881/udp"
+    restart: unless-stopped
+
+volumes:
+  qbittorrent_config:
+  adguardvpn_config:
