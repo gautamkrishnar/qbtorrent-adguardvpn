@@ -56,7 +56,7 @@ while [[ "$SECONDS" -lt "$end" ]]; do
     fi
     sleep 4
     current_ip=$(get_ip)
-    if [[ -n "$current_ip" && "$current_ip" != "$VPN_IP" ]]; then
+    if [[ -n "$current_ip" && -n "$VPN_IP" && "$current_ip" != "$VPN_IP" ]]; then
       echo "Change in IP detected, restarting..."
       docker restart $(hostname)
     fi

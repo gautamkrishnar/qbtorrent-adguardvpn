@@ -27,7 +27,7 @@ fi
 HOST_IP=$(get_ip)
 write_var "HOST_IP" "$HOST_IP"
 
-if [[ -v ADGUARD_LOCATION ]]; then
+if [[ -v ADGUARD_LOCATION && -n "$ADGUARD_LOCATION" ]]; then
   adguardvpn-cli connect -y -4 -l "$ADGUARD_LOCATION" &
 else
   adguardvpn-cli connect -y -4 -f &
@@ -44,7 +44,7 @@ fi
 VPN_IP=$(get_ip)
 write_var "VPN_IP" "$VPN_IP"
 
-if [[ -n ${var+x} && "$HOST_IP" == "$VPN_IP" ]]; then
+if [[ -n "$HOST_IP" && "$HOST_IP" == "$VPN_IP" ]]; then
   echo "HOST_IP == VPN_IP THIS SHOULD NOT HAPPEN!!!"
   docker stop $(hostname)
 fi
