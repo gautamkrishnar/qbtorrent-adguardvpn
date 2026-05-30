@@ -74,7 +74,7 @@ All configuration is done via the `.env` file:
 | `PUID` | User ID for file permissions | No (default: 1000) |
 | `PGID` | Group ID for file permissions | No (default: 1000) |
 | `TZ` | Timezone | No (default: UTC) |
-| `VIRTUAL_HOST` | Hostname for reverse proxy (nginx-proxy) | No |
+| `VIRTUAL_HOST` | Hostname for reverse proxy | No |
 | `VIRTUAL_PORT` | Port for reverse proxy (set to `8080`) | No |
 
 ### Volumes
@@ -86,28 +86,6 @@ All configuration is done via the `.env` file:
 | bind mount | `/downloads` | Download directory |
 
 The VPN and torrent configs are separated so you can reset one without losing the other.
-
-### Reverse Proxy
-
-If using [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy), add these to your `.env`:
-
-```
-VIRTUAL_HOST=torrent.example.com
-VIRTUAL_PORT=8080
-```
-
-And add the container to your proxy network in `docker-compose.yml`:
-
-```yaml
-services:
-  qbittorrent:
-    networks:
-      - proxynet
-
-networks:
-  proxynet:
-    external: true
-```
 
 ### Pre-built Image
 
