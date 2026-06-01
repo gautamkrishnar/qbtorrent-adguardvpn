@@ -25,11 +25,11 @@ docker compose up -d
 
 The qBittorrent web UI will be available at `http://localhost:8080`.
 
-**Default credentials:**
-- Username: `admin`
-- Password: Check container logs — `docker compose logs | grep "temporary password"`
+**Credentials:**
 
-Change your password in **Tools → Options → Web UI** after first login.
+Set `QBT_USERNAME` and `QBT_PASSWORD` in your `.env` file to auto-configure credentials on first boot. If not set, qBittorrent generates a temporary password — check it with `docker compose logs | grep "temporary password"`.
+
+You can also change credentials later in **Tools → Options → Web UI**.
 
 ### Recommended qBittorrent Settings
 
@@ -70,6 +70,8 @@ All configuration is done via the `.env` file:
 | `ADGUARD_PASSWORD` | AdGuard VPN account password | Yes |
 | `ADGUARD_LOCATION` | VPN server location (city/country/ISO code). Empty = fastest. | No |
 | `ADGUARD_SEND_REPORTS` | Send telemetry to AdGuard (`on`/`off`) | No |
+| `QBT_USERNAME` | qBittorrent web UI username (auto-set on first boot) | No |
+| `QBT_PASSWORD` | qBittorrent web UI password (auto-set on first boot, also used by cronjob to auto-resume errored torrents) | No |
 | `DOWNLOADS_PATH` | Host path for downloads | Yes |
 | `PUID` | User ID for file permissions | No (default: 1000) |
 | `PGID` | Group ID for file permissions | No (default: 1000) |
@@ -124,6 +126,8 @@ A cron job runs every minute inside the container:
 3. Restarts the container if the VPN drops or the IP changes
 
 This ensures torrent traffic never leaks outside the VPN tunnel.
+
+If `QBT_USERNAME` and `QBT_PASSWORD` are set, the cronjob also auto-resumes any errored torrents.
 
 ### Health Checks
 

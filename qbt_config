@@ -1,0 +1,18 @@
+#!/bin/bash
+# Set qBittorrent username/password from env vars on first boot
+
+CONF="/config/qBittorrent/qBittorrent.conf"
+
+if [[ -v QBT_USERNAME && -v QBT_PASSWORD && -f "$CONF" ]]; then
+  if ! grep -q 'WebUI\\Username=' "$CONF"; then
+    HASH=$(python3 -c "
+import hashlib, os, base64
+salt = os.urandom(16)
+key = hashlib.pbkdf2_hmac('sha512', os.environ['QBT_PASSWORD'].encode(), salt, 100000)
+print(base64.b64encode(salt).decode() + ':' + base64.b64encode(key).decode())
+")
+    printf 'WebUI\\Username=%s\n' "$QBT_USERNAME" >> "$CONF"
+    printf 'WebUI\\Password_PBKDF2="@ByteArray(%s)"\n' "$HASH" >> "$CONF"
+    echo "qBittorrent credentials set for user: ${QBT_USERNAME}"
+  fi
+fi

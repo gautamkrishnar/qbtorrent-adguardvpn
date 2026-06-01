@@ -11,6 +11,7 @@ RUN apk add --no-cache curl docker && \
 COPY cronjob /
 COPY functions.sh /
 COPY adguard_config /custom-cont-init.d
+COPY qbt_config /custom-cont-init.d
 
 HEALTHCHECK --interval=60s --timeout=10s --start-period=45s --retries=3 \
   CMD curl -sf http://localhost:8080 > /dev/null && \
