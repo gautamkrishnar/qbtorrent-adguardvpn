@@ -76,8 +76,6 @@ All configuration is done via the `.env` file:
 | `PUID` | User ID for file permissions | No (default: 1000) |
 | `PGID` | Group ID for file permissions | No (default: 1000) |
 | `TZ` | Timezone | No (default: UTC) |
-| `VIRTUAL_HOST` | Hostname for reverse proxy | No |
-| `VIRTUAL_PORT` | Port for reverse proxy (set to `8080`) | No |
 
 ### Volumes
 
