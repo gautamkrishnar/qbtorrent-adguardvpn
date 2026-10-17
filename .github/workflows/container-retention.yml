@@ -1,0 +1,30 @@
+name: Retain GHCR images
+
+on:
+  schedule:
+    - cron: "23 4 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Preview deletions (true) or apply them (false)
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retain recent versions and protect multi-arch manifests
+        uses: snok/container-retention-policy@d3bdcf5ce9b05f685154e4a16c39233b245e3d53 # v3.1.0
+        with:
+          account: user
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: qbtorrent-adguardvpn
+          tag-selection: both
+          cut-off: 30d
+          keep-n-most-recent: 5
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
