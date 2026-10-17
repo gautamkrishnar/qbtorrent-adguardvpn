@@ -1,0 +1,4 @@
+services:
+  qbittorrent:
+    image: ghcr.io/gautamkrishnar/qbtorrent-adguardvpn:local
+    build: .

@@ -20,10 +20,18 @@ git clone https://github.com/gautamkrishnar/qbtorrent-adguardvpn.git
 cd qbtorrent-adguardvpn
 cp .env.example .env
 # Edit .env with your AdGuard VPN credentials and download path
+docker compose pull
 docker compose up -d
 ```
 
-The qBittorrent web UI will be available at `http://localhost:8080`.
+Run these commands from the repository root. The default `docker-compose.yml` pulls the published image from GHCR; it does not build from source. The qBittorrent web UI will be available at `http://localhost:8080`.
+
+To update an existing installation to the latest published image, run from the repository root:
+
+```bash
+docker compose pull
+docker compose up -d
+```
 
 The Docker host must provide `/dev/net/tun` (load the Linux `tun` module if needed); the container uses this device and `NET_ADMIN` for AdGuard's TUN mode.
 
@@ -90,20 +98,24 @@ All configuration is done via the `.env` file:
 
 The VPN and torrent configs are separated so you can reset one without losing the other.
 
-### Pre-built Image
+### Use the Published Image
 
-Pull the pre-built image from GitHub Container Registry:
-
-```bash
-docker pull ghcr.io/gautamkrishnar/qbtorrent-adguardvpn:latest
-```
-
-### Building from Source
+The default `docker-compose.yml` uses `ghcr.io/gautamkrishnar/qbtorrent-adguardvpn:latest`. Pull and start it from the repository root:
 
 ```bash
-docker compose build
+docker compose pull
 docker compose up -d
 ```
+
+### Build from Local Source
+
+To build the image from your checked-out source instead, combine the main Compose file with the local override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
+Compose merges files in the order listed. The main file provides the full service configuration, and `docker-compose.local.yml` adds a local build for the same `qbittorrent` service. The override is intentionally not a standalone deployment file; use both files in the command above.
 
 ### VPN Locations
 

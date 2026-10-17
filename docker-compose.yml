@@ -1,7 +1,6 @@
 services:
   qbittorrent:
     image: ghcr.io/gautamkrishnar/qbtorrent-adguardvpn:latest
-    build: .
     container_name: qbittorrent-vpn
     stop_grace_period: 75s
     cap_add:
