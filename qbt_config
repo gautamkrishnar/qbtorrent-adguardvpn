@@ -1,18 +1,88 @@
 #!/bin/bash
-# Set qBittorrent username/password from env vars on first boot
+set -euo pipefail
 
 CONF="/config/qBittorrent/qBittorrent.conf"
+VPN_INTERFACE=${QBT_VPN_INTERFACE:-tun0}
 
-if [[ -v QBT_USERNAME && -v QBT_PASSWORD && -f "$CONF" ]]; then
-  if ! grep -q 'WebUI\\Username=' "$CONF"; then
-    HASH=$(python3 -c "
-import hashlib, os, base64
-salt = os.urandom(16)
-key = hashlib.pbkdf2_hmac('sha512', os.environ['QBT_PASSWORD'].encode(), salt, 100000)
-print(base64.b64encode(salt).decode() + ':' + base64.b64encode(key).decode())
-")
-    printf 'WebUI\\Username=%s\n' "$QBT_USERNAME" >> "$CONF"
-    printf 'WebUI\\Password_PBKDF2="@ByteArray(%s)"\n' "$HASH" >> "$CONF"
-    echo "qBittorrent credentials set for user: ${QBT_USERNAME}"
-  fi
+if ! ip link show dev "$VPN_INTERFACE" >/dev/null 2>&1; then
+  echo "VPN interface $VPN_INTERFACE is unavailable; refusing to start qBittorrent."
+  kill -TERM 1
+  exit 0
 fi
+
+if [[ ! -f "$CONF" ]]; then
+  echo "qBittorrent config was not initialized; refusing to start without VPN binding."
+  kill -TERM 1
+  exit 0
+fi
+
+python3 - "$CONF" "$VPN_INTERFACE" <<'PY'
+import base64
+import hashlib
+import os
+import secrets
+import sys
+
+path, interface = sys.argv[1:]
+with open(path, encoding="utf-8") as config_file:
+    lines = config_file.read().splitlines()
+
+preferences_start = next(
+    (index for index, line in enumerate(lines) if line.strip() == "[Preferences]"),
+    None,
+)
+if preferences_start is None:
+    lines.extend(["", "[Preferences]"])
+    preferences_start = len(lines) - 1
+
+preferences_end = next(
+    (
+        index
+        for index in range(preferences_start + 1, len(lines))
+        if lines[index].strip().startswith("[") and lines[index].strip().endswith("]")
+    ),
+    len(lines),
+)
+
+updates = {
+    r"Connection\Interface": interface,
+    # Do not retain an old VPN address when the provider rotates it.
+    r"Connection\InterfaceAddress": "",
+}
+
+username = os.environ.get("QBT_USERNAME", "")
+password = os.environ.get("QBT_PASSWORD", "")
+if username and password:
+    if "\n" in username or "\r" in username:
+        raise SystemExit("QBT_USERNAME must not contain a newline")
+    pref_keys = {
+        line.split("=", 1)[0].strip()
+        for line in lines[preferences_start + 1 : preferences_end]
+        if "=" in line and not line.lstrip().startswith(("#", ";"))
+    }
+    if r"WebUI\Username" not in pref_keys:
+        updates[r"WebUI\Username"] = username
+    if r"WebUI\Password_PBKDF2" not in pref_keys:
+        salt = secrets.token_bytes(16)
+        key = hashlib.pbkdf2_hmac("sha512", password.encode(), salt, 100_000)
+        encoded = base64.b64encode(salt).decode() + ":" + base64.b64encode(key).decode()
+        updates[r"WebUI\Password_PBKDF2"] = f'"@ByteArray({encoded})"'
+
+updated_keys = set()
+for index in range(preferences_start + 1, preferences_end):
+    line = lines[index]
+    if "=" not in line or line.lstrip().startswith(("#", ";")):
+        continue
+    key = line.split("=", 1)[0].strip()
+    if key in updates:
+        lines[index] = f"{key}={updates[key]}"
+        updated_keys.add(key)
+
+missing = [f"{key}={value}" for key, value in updates.items() if key not in updated_keys]
+lines[preferences_end:preferences_end] = missing
+
+with open(path, "w", encoding="utf-8", newline="\n") as config_file:
+    config_file.write("\n".join(lines) + "\n")
+
+print(f"qBittorrent is bound to VPN interface {interface}")
+PY

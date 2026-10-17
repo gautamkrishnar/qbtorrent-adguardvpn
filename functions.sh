@@ -34,6 +34,8 @@ write_var() {
 }
 
 get_ip () {
-  echo $(curl -s --connect-timeout 5 https://api.ipify.org/?format=text)
-  return 0
+  local ip
+  ip=$(curl -fsS --connect-timeout 5 --max-time 10 https://api.ipify.org/?format=text) || return 1
+  [[ -n "$ip" ]] || return 1
+  printf '%s\n' "$ip"
 }

@@ -33,14 +33,15 @@ fi
 
 echo $$ > "$PIDFILE"
 
-if [[ $(adguardvpn-cli status | head -n 1) == "VPN is disconnected" ]]; then
-  echo "VPN disconnected, restarting..."
-  docker restart $(hostname)
-  exit
+VPN_STATUS=$(adguardvpn-cli status 2>&1 | head -n 1)
+if [[ ! "$VPN_STATUS" =~ ^Connected\ to\ .* ]]; then
+  echo "VPN is not connected; requesting graceful container restart..."
+  kill -TERM 1
+  exit 0
 fi
 
 # Resume only errored torrents
-if [[ -v QBT_USERNAME && -v QBT_PASSWORD ]]; then
+if [[ ${QBT_USERNAME+x} && ${QBT_PASSWORD+x} ]]; then
   curl -s -c /tmp/qbt_cron_cookie -X POST http://localhost:8080/api/v2/auth/login --data-urlencode "username=${QBT_USERNAME}" --data-urlencode "password=${QBT_PASSWORD}" 2>/dev/null
   ERRORED=$(curl -s -b /tmp/qbt_cron_cookie 'http://localhost:8080/api/v2/torrents/info?filter=errored' 2>/dev/null | grep -o '"hash":"[^"]*"' | cut -d'"' -f4 | paste -sd'|')
   if [[ -n "$ERRORED" ]]; then
@@ -55,10 +56,10 @@ while [[ "$SECONDS" -lt "$end" ]]; do
       break
     fi
     sleep 4
-    current_ip=$(get_ip)
-    if [[ -n "$current_ip" && -n "$VPN_IP" && "$current_ip" != "$VPN_IP" ]]; then
-      echo "Change in IP detected, restarting..."
-      docker restart $(hostname)
+    if ! current_ip=$(get_ip) || [[ -z "$VPN_IP" || "$current_ip" != "$VPN_IP" ]]; then
+      echo "Public IP check failed or VPN IP changed; requesting graceful container restart..."
+      kill -TERM 1
+      exit 0
     fi
     write_var "LAST_RUN" "$(date +%s)"
 done

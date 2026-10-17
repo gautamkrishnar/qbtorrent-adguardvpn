@@ -1,15 +1,15 @@
 ## qbtorrent-adguardvpn
 
-qBittorrent + AdGuard VPN in a single Docker container. All torrent traffic is routed through the VPN tunnel with automatic kill switch protection.
+qBittorrent + AdGuard VPN in a single Docker container. qBittorrent is bound to the VPN tunnel interface, while a watchdog checks the VPN connection and public IP.
 
 ### Features
 
 - **qBittorrent** with full web UI
 - **AdGuard VPN** with automatic login and connection
-- **Kill switch** — container restarts if VPN drops or IP leaks
+- **Kill switch** — qBittorrent is bound to the VPN interface; the watchdog gracefully restarts the container if the VPN disconnects or a public IP check fails
 - **Health checks** — monitors both VPN connection and web UI availability
 - **IPv4-only mode** — avoids IPv6-only VPN servers that break tracker connectivity
-- **Graceful shutdown** — 30s stop grace period ensures torrents save state properly
+- **Graceful shutdown** — s6 receives `SIGTERM` and gets up to 60 seconds to stop processes; Docker allows 75 seconds for the full shutdown
 - **Separated volumes** — qBittorrent config and VPN config stored independently
 - **Multi-arch** — supports `linux/amd64` and `linux/arm64`
 
@@ -24,6 +24,8 @@ docker compose up -d
 ```
 
 The qBittorrent web UI will be available at `http://localhost:8080`.
+
+The Docker host must provide `/dev/net/tun` (load the Linux `tun` module if needed); the container uses this device and `NET_ADMIN` for AdGuard's TUN mode.
 
 **Credentials:**
 
@@ -69,9 +71,10 @@ All configuration is done via the `.env` file:
 | `ADGUARD_USERNAME` | AdGuard VPN account email | Yes |
 | `ADGUARD_PASSWORD` | AdGuard VPN account password | Yes |
 | `ADGUARD_LOCATION` | VPN server location (city/country/ISO code). Empty = fastest. | No |
-| `ADGUARD_SEND_REPORTS` | Send telemetry to AdGuard (`on`/`off`) | No |
+| `ADGUARD_SEND_REPORTS` | Send crash reports to AdGuard (`on`/`off`) | No |
 | `QBT_USERNAME` | qBittorrent web UI username (auto-set on first boot) | No |
 | `QBT_PASSWORD` | qBittorrent web UI password (auto-set on first boot, also used by cronjob to auto-resume errored torrents) | No |
+| `QBT_VPN_INTERFACE` | qBittorrent network interface binding (default: `tun0`) | No |
 | `DOWNLOADS_PATH` | Host path for downloads | Yes |
 | `PUID` | User ID for file permissions | No (default: 1000) |
 | `PGID` | Group ID for file permissions | No (default: 1000) |
@@ -120,10 +123,10 @@ docker compose restart
 
 A cron job runs every minute inside the container:
 1. Checks if the VPN is still connected
-2. Monitors for IP address changes
-3. Restarts the container if the VPN drops or the IP changes
+2. Checks the public IP every four seconds and fails closed if the check errors or differs from the connected VPN IP
+3. Sends `SIGTERM` to s6 if the VPN drops or the IP check fails. s6 stops qBittorrent cleanly, then Docker's `unless-stopped` policy restarts the container.
 
-This ensures torrent traffic never leaks outside the VPN tunnel.
+qBittorrent is configured to use the VPN interface directly, so torrent transfers stop if that interface disappears. The web UI remains available through the container's published port. `docker compose stop` remains a manual stop and leaves the container stopped.
 
 If `QBT_USERNAME` and `QBT_PASSWORD` are set, the cronjob also auto-resumes any errored torrents.
 
